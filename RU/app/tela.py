@@ -22,7 +22,7 @@ txt2.place(x=20,y=165)
 txt3= ctk.CTkLabel(vot,text="Vegetariana:",font=("Arial",12))
 txt3.place(x=20,y=300)
 txt22= ctk.CTkLabel(vot,text=f"Total de votos: {x}",font=("Arial",15))
-txt22.place(relx=0.65, rely=0.98, anchor="sw")
+txt22.place(relx=0.60, rely=0.98, anchor="sw")
 
 otimo1= ctk.CTkFrame(vot, width= 100,height=100,fg_color="#28a745",)
 otimo1.place(x=100,y=20,)
