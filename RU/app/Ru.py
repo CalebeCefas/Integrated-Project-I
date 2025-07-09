@@ -53,9 +53,6 @@ def mostrar_pagina(nome):
         # Cria o frame da votação DENTRO do main_frame
         voto = ctk.CTkFrame(main_frame, width=500, height=400)
         voto.pack(expand=True, anchor="center", pady=20)
-
-        # Adiciona aqui os widgets da votação (labels, frames, etc)
-        ctk.CTkLabel(voto, text="Carne Vermelha:", font=("Arial", 12)).place(x=20, y=50)
         
         # Textos informativos
         ctk.CTkLabel(voto, text="Carne \nVermelha:", font=("Arial", 12)).place(x=20, y=50)
