@@ -229,7 +229,8 @@ def mostrar_pagina(nome):
                     print("Dados salvos no banco.")
                 except Exception as e:
                     print("Erro ao salvar no banco:", e)
-                    salvar_no_banco(partes)
+
+        salvar_no_banco(partes)
 
 
         # Função que roda em thread para ler a porta serial
