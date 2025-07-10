@@ -1,4 +1,15 @@
 import serial
+import mysql.connector
+from datetime import datetime
+
+def conectar_banco():
+    return mysql.connector.connect(
+        host="localhost",
+        user="seu_usuario",
+        password="sua_senha",
+        database="ru"
+    )
+
 
 porta_serial = 'COM3'
 baud_rate = 9600
@@ -22,8 +33,9 @@ import threading
 # === Configuração da janela ===
 janela = ctk.CTk()
 janela.title("Avaliação da qualidade dos alimentos")
-janela.geometry("700x600")
-janela.minsize(width=700, height=600)
+largura = janela.winfo_screenwidth()
+altura = janela.winfo_screenheight()
+janela.geometry(f"{largura}x{altura}")
 
 # Tema
 tema = ctk.CTkOptionMenu(janela, values=["Light", "Dark"], command=lambda escolha: ctk.set_appearance_mode(escolha))
@@ -175,6 +187,51 @@ def mostrar_pagina(nome):
             total = partes[-1]
             label_total.configure(text=f"Total de votos: {total}")
 
+            def salvar_no_banco(partes):
+                try:
+                    conn = conectar_banco()
+                    cursor = conn.cursor()
+
+                    dados = {
+                        "vegetariano_otimo": 0, "vegetariano_bom": 0, "vegetariano_ruim": 0,
+                        "carne_branca_otimo": 0, "carne_branca_bom": 0, "carne_branca_ruim": 0,
+                        "carne_vermelha_otimo": 0, "carne_vermelha_bom": 0, "carne_vermelha_ruim": 0,
+                        "total": 0
+                    }
+
+                    for i in range(0, 27, 3):
+                        nome = partes[i]
+                        qtd = int(partes[i + 1])
+                        if nome in dados:
+                            dados[nome] = qtd
+
+                    dados["total"] = int(partes[-1])
+                    agora = datetime.now()
+
+                    query = """
+                        INSERT INTO avaliacoes 
+                        (DATA_HORA, VG_OTIMO, VG_BOM, VG_RUIM, CB_OTIMO, CB_BOM, CB_RUIM, CVM_OTIMO, CVM_BOM, CVM_RUIM, TOTAL) 
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """
+
+                    valores = (
+                        agora,
+                        dados["vegetariano_otimo"], dados["vegetariano_bom"], dados["vegetariano_ruim"],
+                        dados["carne_branca_otimo"], dados["carne_branca_bom"], dados["carne_branca_ruim"],
+                        dados["carne_vermelha_otimo"], dados["carne_vermelha_bom"], dados["carne_vermelha_ruim"],
+                        dados["total"]
+                    )
+
+                    cursor.execute(query, valores)
+                    conn.commit()
+                    cursor.close()
+                    conn.close()
+                    print("Dados salvos no banco.")
+                except Exception as e:
+                    print("Erro ao salvar no banco:", e)
+                    salvar_no_banco(partes)
+
+
         # Função que roda em thread para ler a porta serial
         def ler_serial():
             try:
@@ -191,9 +248,68 @@ def mostrar_pagina(nome):
         thread_serial.start()
 
     elif nome == "Gráficos":
-        ctk.CTkLabel(main_frame, text="Gráficos", font=("Arial", 18)).pack(pady=20)
+        ctk.CTkLabel(main_frame, text="Gráficos", font=("Arial", 18)).pack(pady=10)
+
     elif nome == "Relatórios":
-        ctk.CTkLabel(main_frame, text="Relatórios", font=("Arial", 18)).pack(pady=20)
+        ctk.CTkLabel(main_frame, text="Relatórios", font=("Arial", 18)).pack(pady=10)
+
+        frame_pesquisa = ctk.CTkFrame(main_frame)
+        frame_pesquisa.pack(pady=10)
+
+        entrada_data = ctk.CTkEntry(frame_pesquisa, placeholder_text="Data (DD-MM-AAAA)")
+        entrada_data.pack(side="left", padx=10)
+
+        botao_pesquisar = ctk.CTkButton(
+            frame_pesquisa,
+            text="Pesquisar",
+            command=lambda: pesquisar_data(entrada_data.get())
+        )
+        botao_pesquisar.pack(side="left")
+
+        resultado_pesquisa = ctk.CTkTextbox(main_frame, height=300, width=600)
+        resultado_pesquisa.pack(pady=10)
+
+        def pesquisar_data(data):
+            try:
+                # Converter de DD-MM-AAAA para AAAA-MM-DD
+                data_convertida = datetime.strptime(data, "%d-%m-%Y").strftime("%Y-%m-%d")
+
+                conn = conectar_banco()
+                cursor = conn.cursor()
+
+                consulta = """
+                    SELECT * FROM avaliacoes
+                    WHERE DATE(DATA_HORA) = %s
+                """
+                cursor.execute(consulta, (data_convertida,))
+                resultados = cursor.fetchall()
+
+                resultado_pesquisa.delete("0.0", "end")  # limpa o texto
+
+                if resultados:
+                    for linha in resultados:
+                        texto = f"""
+        ID: {linha[0]}
+        Data/Hora: {linha[1]}
+        Vegetariano - Ótimo: {linha[2]}, Bom: {linha[4]}, Ruim: {linha[3]}
+        Carne Branca - Ótimo: {linha[5]}, Bom: {linha[7]}, Ruim: {linha[6]}
+        Carne Vermelha - Ótimo: {linha[8]}, Bom: {linha[10]}, Ruim: {linha[9]}
+        Total de votos: {linha[11]}
+        -------------------------
+        """
+                        resultado_pesquisa.insert("end", texto)
+                else:
+                    resultado_pesquisa.insert("end", "Nenhum resultado encontrado.")
+                
+                cursor.close()
+                conn.close()
+
+            except ValueError:
+                resultado_pesquisa.delete("0.0", "end")
+                resultado_pesquisa.insert("end", "Data inválida. Use o formato DD-MM-AAAA.")
+            except Exception as e:
+                resultado_pesquisa.insert("end", f"Erro ao buscar dados: {e}")
+
 
 
 janela.mainloop()
