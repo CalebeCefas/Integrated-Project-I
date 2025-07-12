@@ -3,6 +3,8 @@ import mysql.connector
 import customtkinter as ctk
 import threading
 from datetime import datetime
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import matplotlib.pyplot as plt
 
 def conectar_banco():
     return mysql.connector.connect(
@@ -23,11 +25,6 @@ largura = janela.winfo_screenwidth()
 altura = janela.winfo_screenheight()
 janela.geometry(f"{largura}x{altura}")
 
-# Tema
-tema = ctk.CTkOptionMenu(janela, values=["Light", "Dark"], command=lambda escolha: ctk.set_appearance_mode(escolha))
-tema.place(x=20, y=10)
-tema.set("Dark")
-
 # Frame da sidebar
 sidebar = ctk.CTkFrame(janela, width=200, corner_radius=0)
 sidebar.pack(side="left", fill="y")
@@ -38,9 +35,15 @@ main_frame.pack(side="right", fill="both", expand=True)
 
 ctk.CTkLabel(sidebar, text="Menu", font=("Arial", 20, "bold")).pack(pady=20)
 
+# Tema
+tema = ctk.CTkOptionMenu(sidebar, values=["Light", "Dark"], command=lambda escolha: ctk.set_appearance_mode(escolha))
+tema.place(x=20, y=10)
+tema.set("Dark")
+
+#botões do menu
 ctk.CTkButton(sidebar, text="Votação", command=lambda: mostrar_pagina("Votação")).pack(pady=10, fill="x", padx=10)
 ctk.CTkButton(sidebar, text="Gráficos", command=lambda: mostrar_pagina("Gráficos")).pack(pady=10, fill="x", padx=10)
-ctk.CTkButton(sidebar, text="Relatórios", command=lambda: mostrar_pagina("Relatórios")).pack(pady=10, fill="x", padx=10)
+ctk.CTkButton(sidebar, text="Pesquisa", command=lambda: mostrar_pagina("Pesquisa")).pack(pady=10, fill="x", padx=10)
 
 paginas = {}
 
@@ -50,6 +53,27 @@ def atualizar_horario():
     agora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     label_horario.configure(text="Votação - " + agora)
     janela.after(1000, atualizar_horario)
+
+# Lista de horários em que você quer salvar os dados (HH:MM)
+horarios_de_salvamento = ["13:15", "18:15"]
+ultima_hora_salva = None  # para evitar salvar várias vezes no mesmo minuto
+
+# Esta função será chamada a cada minuto
+def verificar_horario_para_salvar():
+    global ultima_hora_salva
+
+    agora = datetime.now().strftime("%H:%M")
+
+    if agora in horarios_de_salvamento and agora != ultima_hora_salva:
+        print(f"[{agora}] Salvando dados no banco...")
+
+        if ultima_linha_recebida:  # <-- linha global com os últimos dados da serial
+            salvar_no_banco(ultima_linha_recebida.split(','))
+
+        ultima_hora_salva = agora
+
+    # Chama a função novamente em 60 segundos
+    janela.after(60000, verificar_horario_para_salvar) 
 
 def construir_pagina_votacao(frame):
     global label_horario
@@ -165,6 +189,9 @@ def construir_pagina_votacao(frame):
 
     # Função para processar os dados recebidos do Arduino e atualizar labels
     def processar_dados(linha):
+        global ultima_linha_recebida
+        ultima_linha_recebida = linha
+        
         partes = linha.split(',')
         if len(partes) < 28:  # 9 votos * 3 partes + 1 total
             return
@@ -242,30 +269,94 @@ def construir_pagina_votacao(frame):
         except Exception as e:
             print("Erro ao salvar no banco:", e)
 
-
-
-        # Função que roda em thread para ler a porta serial
-        def ler_serial():
-            try:
-                porta = serial.Serial(porta_serial, baud_rate, timeout=timeout)
-                while True:
-                    linha = porta.readline().decode('utf-8', errors='ignore').strip()
-                    if linha:
-                        processar_dados(linha)
-            except serial.SerialException as e:
-                print(f"Erro na serial: {e}")
-
-        # Iniciar thread da serial como daemon para não travar a interface
-        thread_serial = threading.Thread(target=ler_serial, daemon=True)
-        thread_serial.start()
-
-        salvar_no_banco(partes)
-
 def construir_pagina_graficos(frame):
     ctk.CTkLabel(frame, text="Gráficos", font=("Arial", 18)).pack(pady=10)
+    
+    container = ctk.CTkFrame(frame)
+    container.pack(fill="both", expand=True, padx=20, pady=10)
 
-def construir_pagina_relatorios(frame):
-    ctk.CTkLabel(frame, text="Relatórios", font=("Arial", 18)).pack(pady=10)
+    opcao_grafico = ctk.CTkOptionMenu(container, values=["Votação em tempo real", "Por dia da semana"])
+    opcao_grafico.pack(pady=10)
+    opcao_grafico.set("Votação em tempo real")
+
+    grafico_frame = ctk.CTkFrame(container)
+    grafico_frame.pack(fill="both", expand=True)
+
+    def atualizar_grafico():
+        for widget in grafico_frame.winfo_children():
+            widget.destroy()
+
+        tipo = opcao_grafico.get()
+        fig, ax = plt.subplots(figsize=(8, 4))
+        fig.patch.set_facecolor('#f0f0f0')
+
+        conn = conectar_banco()
+        cursor = conn.cursor()
+
+        if tipo == "Votação em tempo real":
+            query = """
+                SELECT DATE_FORMAT(DATA_HORA, '%H:%i') as horario,
+                       CVM_OTIMO, CVM_BOM, CVM_RUIM
+                FROM avaliacoes
+                WHERE DATA_HORA >= NOW() - INTERVAL 2 HOUR
+                ORDER BY DATA_HORA
+            """
+            cursor.execute(query)
+            resultados = cursor.fetchall()
+            horarios = [linha[0] for linha in resultados]
+            otimos = [linha[1] for linha in resultados]
+            bons = [linha[2] for linha in resultados]
+            ruins = [linha[3] for linha in resultados]
+
+            ax.plot(horarios, otimos, color='green', label='Ótimo')
+            ax.plot(horarios, bons, color='orange', label='Bom')
+            ax.plot(horarios, ruins, color='red', label='Ruim')
+            ax.set_title("Avaliação da Carne Vermelha (últimas 2h)")
+            ax.set_xlabel("Horário")
+            ax.set_ylabel("Votos")
+
+        elif tipo == "Por dia da semana":
+            query = """
+                SELECT DAYNAME(DATA_HORA) as dia,
+                       AVG(CVM_OTIMO), AVG(CVM_BOM), AVG(CVM_RUIM)
+                FROM avaliacoes
+                GROUP BY dia
+                ORDER BY FIELD(dia, 'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')
+            """
+            cursor.execute(query)
+            resultados = cursor.fetchall()
+            dias = [linha[0] for linha in resultados]
+            otimos = [linha[1] for linha in resultados]
+            bons = [linha[2] for linha in resultados]
+            ruins = [linha[3] for linha in resultados]
+
+            ax.plot(dias, otimos, color='green', label='Ótimo')
+            ax.plot(dias, bons, color='orange', label='Bom')
+            ax.plot(dias, ruins, color='red', label='Ruim')
+            ax.set_title("Média de Avaliação por Dia da Semana")
+            ax.set_xlabel("Dia")
+            ax.set_ylabel("Média de Votos")
+
+        cursor.close()
+        conn.close()
+
+        ax.legend()
+        ax.grid(True)
+
+        canvas = FigureCanvasTkAgg(fig, master=grafico_frame)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill="both", expand=True)
+
+    opcao_grafico.configure(command=atualizar_grafico)
+    
+    def atualizar_periodicamente():
+        atualizar_grafico()
+        frame.after(600000, atualizar_periodicamente)  # 600000 ms = 10 minutos
+
+    atualizar_periodicamente()
+
+def construir_pagina_pesquisa(frame):
+    ctk.CTkLabel(frame, text="Pesquisa", font=("Arial", 18)).pack(pady=10)
 
     frame_pesquisa = ctk.CTkFrame(frame)
     frame_pesquisa.pack(pady=10)
@@ -305,10 +396,11 @@ def construir_pagina_relatorios(frame):
                     texto = f"""
     ID: {linha[0]}
     Data/Hora: {linha[1]}
-    Vegetariano - Ótimo: {linha[2]}, Bom: {linha[4]}, Ruim: {linha[3]}
-    Carne Branca - Ótimo: {linha[5]}, Bom: {linha[7]}, Ruim: {linha[6]}
-    Carne Vermelha - Ótimo: {linha[8]}, Bom: {linha[10]}, Ruim: {linha[9]}
+    Vegetariano - Ótimo: {linha[2]}, Bom: {linha[3]}, Ruim: {linha[4]}
+    Carne Branca - Ótimo: {linha[5]}, Bom: {linha[6]}, Ruim: {linha[7]}
+    Carne Vermelha - Ótimo: {linha[8]}, Bom: {linha[9]}, Ruim: {linha[10]}
     Total de votos: {linha[11]}
+
     -------------------------
     """
                     resultado_pesquisa.insert("end", texto)
@@ -338,11 +430,12 @@ def mostrar_pagina(nome):
             construir_pagina_votacao(frame)
         elif nome == "Gráficos":
             construir_pagina_graficos(frame)
-        elif nome == "Relatórios":
-            construir_pagina_relatorios(frame)
+        elif nome == "Pesquisa":
+            construir_pagina_pesquisa(frame)
     else:
         paginas[nome].pack(fill="both", expand=True)
 
 mostrar_pagina("Votação")
+verificar_horario_para_salvar()
 
 janela.mainloop()
