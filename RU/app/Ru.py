@@ -1,3 +1,4 @@
+from datetime import time
 import serial
 import mysql.connector
 import customtkinter as ctk
@@ -23,7 +24,7 @@ janela = ctk.CTk()
 janela.title("Avaliação da qualidade dos alimentos")
 largura = janela.winfo_screenwidth()
 altura = janela.winfo_screenheight()
-janela.geometry(f"{largura}x{altura}")
+janela.geometry(f"{800}x{600}")
 
 # Frame da sidebar
 sidebar = ctk.CTkFrame(janela, width=200, corner_radius=0)
@@ -36,8 +37,8 @@ main_frame.pack(side="right", fill="both", expand=True)
 ctk.CTkLabel(sidebar, text="Menu", font=("Arial", 20, "bold")).pack(pady=20)
 
 # Tema
-tema = ctk.CTkOptionMenu(sidebar, values=["Light", "Dark"], command=lambda escolha: ctk.set_appearance_mode(escolha))
-tema.place(x=20, y=10)
+tema=ctk.CTkOptionMenu(sidebar, values=["Light", "Dark"], command=lambda escolha: ctk.set_appearance_mode(escolha))
+tema.pack(pady=10)
 tema.set("Dark")
 
 #botões do menu
@@ -53,27 +54,27 @@ def atualizar_horario():
     agora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     label_horario.configure(text="Votação - " + agora)
     janela.after(1000, atualizar_horario)
-
+    
 # Lista de horários em que você quer salvar os dados (HH:MM)
-horarios_de_salvamento = ["13:15", "18:15"]
-ultima_hora_salva = None  # para evitar salvar várias vezes no mesmo minuto
+# horarios_de_salvamento = ["13:40", "18:40"]
+# ultima_hora_salva = None  # para evitar salvar várias vezes no mesmo minuto
 
 # Esta função será chamada a cada minuto
-def verificar_horario_para_salvar():
-    global ultima_hora_salva
+# def verificar_horario_para_salvar():
+#     global ultima_hora_salva
 
-    agora = datetime.now().strftime("%H:%M")
+#     agora = datetime.now().strftime("%H:%M")
 
-    if agora in horarios_de_salvamento and agora != ultima_hora_salva:
-        print(f"[{agora}] Salvando dados no banco...")
+#     if agora in horarios_de_salvamento and agora != ultima_hora_salva:
+#         print(f"[{agora}] Salvando dados no banco...")
 
-        if ultima_linha_recebida:  # <-- linha global com os últimos dados da serial
-            salvar_no_banco(ultima_linha_recebida.split(','))
+#         if ultima_linha_recebida:  # <-- linha global com os últimos dados da serial
+#             salvar_no_banco(ultima_linha_recebida.split(','))
 
-        ultima_hora_salva = agora
+#         ultima_hora_salva = agora
 
-    # Chama a função novamente em 60 segundos
-    janela.after(60000, verificar_horario_para_salvar) 
+#     # Chama a função novamente em 60 segundos
+#     janela.after(60000, verificar_horario_para_salvar) 
 
 def construir_pagina_votacao(frame):
     global label_horario
@@ -209,6 +210,7 @@ def construir_pagina_votacao(frame):
         # Atualiza total de votos
         total = partes[-1]
         label_total.configure(text=f"Total de votos: {total}")
+        salvar_no_banco(ultima_linha_recebida.split(','))
 
     # Função que roda em thread para ler a porta serial
     def ler_serial():
@@ -247,21 +249,52 @@ def construir_pagina_votacao(frame):
             dados["total"] = int(partes[-1])
             agora = datetime.now()
 
+
             query = """
                 INSERT INTO avaliacoes 
                 (DATA_HORA, VG_OTIMO, VG_BOM, VG_RUIM, CB_OTIMO, CB_BOM, CB_RUIM, CVM_OTIMO, CVM_BOM, CVM_RUIM, TOTAL) 
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
-
+            query2 = """
+                UPDATE avaliacoes SET
+                DATA_HORA=%s, VG_OTIMO=%s, VG_BOM=%s, VG_RUIM=%s, CB_OTIMO=%s, CB_BOM=%s, CB_RUIM=%s, CVM_OTIMO=%s, CVM_BOM=%s, CVM_RUIM=%s, TOTAL=%s
+                WHERE ID = %s
+            """
+            
             valores = (
-                agora,
-                dados["vegetariano_otimo"], dados["vegetariano_bom"], dados["vegetariano_ruim"],
-                dados["carne_branca_otimo"], dados["carne_branca_bom"], dados["carne_branca_ruim"],
-                dados["carne_vermelha_otimo"], dados["carne_vermelha_bom"], dados["carne_vermelha_ruim"],
-                dados["total"]
-            )
+                    agora,
+                    dados["vegetariano_otimo"], dados["vegetariano_bom"], dados["vegetariano_ruim"],
+                    dados["carne_branca_otimo"], dados["carne_branca_bom"], dados["carne_branca_ruim"],
+                    dados["carne_vermelha_otimo"], dados["carne_vermelha_bom"], dados["carne_vermelha_ruim"],
+                    dados["total"]
+                )
 
-            cursor.execute(query, valores)
+            cursor.execute("SELECT DATA_HORA FROM avaliacoes")
+            resultados = cursor.fetchall()
+            for linha in resultados:
+                data_hora = linha[0]
+                dataA=data_hora.date()
+                horaA=data_hora.time()
+                cursor.execute("SELECT ID FROM avaliacoes WHERE DATA_HORA= %s ",(data_hora,))
+                resultado_id = cursor.fetchone()
+                if resultado_id:
+                    ID = resultado_id[0]
+                else:
+                 ID = None
+                h = datetime.now()
+                if dataA == h.date() and horaA> time(10,30,0) and  horaA< time(13,30,0):
+                    valores_update = valores + (ID,)
+                    cursor.execute(query2, valores_update)
+                    break
+                
+                elif dataA == h.date() and horaA> time(15,30,0) and  horaA< time(18,30,0):
+                    valores_update = valores + (ID,)
+                    cursor.execute(query2, valores_update)
+                    break
+                else:
+                    cursor.execute(query, valores)
+                    break
+            
             conn.commit()
             cursor.close()
             conn.close()
@@ -436,6 +469,6 @@ def mostrar_pagina(nome):
         paginas[nome].pack(fill="both", expand=True)
 
 mostrar_pagina("Votação")
-verificar_horario_para_salvar()
+# verificar_horario_para_salvar()
 
 janela.mainloop()
