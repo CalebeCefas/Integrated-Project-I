@@ -97,16 +97,72 @@ def construir_pagina_votacao(frame):
 
     # Criação dos blocos de votos (ótimo, bom, ruim) para cada refeição
     # Segue o padrão: Frame colorido -> Número de votos -> Percentual
-    # Exemplo abaixo: Carne Vermelha - Ótimo
-    otimo_carne_vermelha = ctk.CTkFrame(voto, width=100, height=100, fg_color="#28a745")  # Verde
+    # Frames e labels para cada avaliação e prato (ótimo, bom, ruim)
+    # Carne Vermelha
+    otimo_carne_vermelha = ctk.CTkFrame(voto, width=100, height=100, fg_color="#28a745")
     otimo_carne_vermelha.place(x=100, y=20)
     txt_otimo_carne_vermelha = ctk.CTkLabel(otimo_carne_vermelha, text="0", font=("Arial", 30, "bold"))
     txt_otimo_carne_vermelha.place(relx=0.5, rely=0.5, anchor="center")
     percentual_otimo_carne_vermelha = ctk.CTkLabel(otimo_carne_vermelha, text="0%", font=("Arial", 15))
     percentual_otimo_carne_vermelha.place(relx=0.5, rely=0.95, anchor="s")
 
-    # Os demais blocos seguem o mesmo padrão para as outras opções...
-    # (omitido aqui para não repetir, mas segue a mesma lógica para carne branca e vegetariano)
+    bom_carne_vermelha = ctk.CTkFrame(voto, width=100, height=100, fg_color="#FFCC00")
+    bom_carne_vermelha.place(x=220, y=20)
+    txt_bom_carne_vermelha = ctk.CTkLabel(bom_carne_vermelha, text="0", font=("Arial", 30, "bold"))
+    txt_bom_carne_vermelha.place(relx=0.5, rely=0.5, anchor="center")
+    percentual_bom_carne_vermelha = ctk.CTkLabel(bom_carne_vermelha, text="0%", font=("Arial", 15))
+    percentual_bom_carne_vermelha.place(relx=0.5, rely=0.95, anchor="s")
+
+    ruim_carne_vermelha = ctk.CTkFrame(voto, width=100, height=100, fg_color="#CC3333")
+    ruim_carne_vermelha.place(x=340, y=20)
+    txt_ruim_carne_vermelha = ctk.CTkLabel(ruim_carne_vermelha, text="0", font=("Arial", 30, "bold"))
+    txt_ruim_carne_vermelha.place(relx=0.5, rely=0.5, anchor="center")
+    percentual_ruim_carne_vermelha = ctk.CTkLabel(ruim_carne_vermelha, text="0%", font=("Arial", 15))
+    percentual_ruim_carne_vermelha.place(relx=0.5, rely=0.95, anchor="s")
+
+    # Carne Branca
+    otimo_carne_branca = ctk.CTkFrame(voto, width=100, height=100, fg_color="#28a745")
+    otimo_carne_branca.place(x=100, y=140)
+    txt_otimo_carne_branca = ctk.CTkLabel(otimo_carne_branca, text="0", font=("Arial", 30, "bold"))
+    txt_otimo_carne_branca.place(relx=0.5, rely=0.5, anchor="center")
+    percentual_otimo_carne_branca = ctk.CTkLabel(otimo_carne_branca, text="0%", font=("Arial", 15))
+    percentual_otimo_carne_branca.place(relx=0.5, rely=0.95, anchor="s")
+
+    bom_carne_branca = ctk.CTkFrame(voto, width=100, height=100, fg_color="#FFCC00")
+    bom_carne_branca.place(x=220, y=140)
+    txt_bom_carne_branca = ctk.CTkLabel(bom_carne_branca, text="0", font=("Arial", 30, "bold"))
+    txt_bom_carne_branca.place(relx=0.5, rely=0.5, anchor="center")
+    percentual_bom_carne_branca = ctk.CTkLabel(bom_carne_branca, text="0%", font=("Arial", 15))
+    percentual_bom_carne_branca.place(relx=0.5, rely=0.95, anchor="s")
+
+    ruim_carne_branca = ctk.CTkFrame(voto, width=100, height=100, fg_color="#CC3333")
+    ruim_carne_branca.place(x=340, y=140)
+    txt_ruim_carne_branca = ctk.CTkLabel(ruim_carne_branca, text="0", font=("Arial", 30, "bold"))
+    txt_ruim_carne_branca.place(relx=0.5, rely=0.5, anchor="center")
+    percentual_ruim_carne_branca = ctk.CTkLabel(ruim_carne_branca, text="0%", font=("Arial", 15))
+    percentual_ruim_carne_branca.place(relx=0.5, rely=0.95, anchor="s")
+
+    # Vegetariano
+    otimo_vegetariano = ctk.CTkFrame(voto, width=100, height=100, fg_color="#28a745")
+    otimo_vegetariano.place(x=100, y=260)
+    txt_otimo_vegetariano = ctk.CTkLabel(otimo_vegetariano, text="0", font=("Arial", 30, "bold"))
+    txt_otimo_vegetariano.place(relx=0.5, rely=0.5, anchor="center")
+    percentual_otimo_vegetariano = ctk.CTkLabel(otimo_vegetariano, text="0%", font=("Arial", 15))
+    percentual_otimo_vegetariano.place(relx=0.5, rely=0.95, anchor="s")
+
+    bom_vegetariano = ctk.CTkFrame(voto, width=100, height=100, fg_color="#FFCC00")
+    bom_vegetariano.place(x=220, y=260)
+    txt_bom_vegetariano = ctk.CTkLabel(bom_vegetariano, text="0", font=("Arial", 30, "bold"))
+    txt_bom_vegetariano.place(relx=0.5, rely=0.5, anchor="center")
+    percentual_bom_vegetariano = ctk.CTkLabel(bom_vegetariano, text="0%", font=("Arial", 15))
+    percentual_bom_vegetariano.place(relx=0.5, rely=0.95, anchor="s")
+
+    ruim_vegetariano = ctk.CTkFrame(voto, width=100, height=100, fg_color="#CC3333")
+    ruim_vegetariano.place(x=340, y=260)
+    txt_ruim_vegetariano = ctk.CTkLabel(ruim_vegetariano, text="0", font=("Arial", 30, "bold"))
+    txt_ruim_vegetariano.place(relx=0.5, rely=0.5, anchor="center")
+    percentual_ruim_vegetariano = ctk.CTkLabel(ruim_vegetariano, text="0%", font=("Arial", 15))
+    percentual_ruim_vegetariano.place(relx=0.5, rely=0.95, anchor="s")
 
     # Label de total de votos
     label_total = ctk.CTkLabel(voto, text="Total de votos: 0", font=("Arial", 15, "bold"))
@@ -252,9 +308,10 @@ def construir_pagina_pesquisa(frame):
 
     def pesquisar_data(data):
         try:
-            data_convertida = datetime.strptime(data, "%d-%m-%Y").strftime("%Y-%m-%d")
+            data_convertida = datetime.strptime(data, "%d-%m-%Y").date()  # Converte para datetime.date
             conn = conectar_banco()
             cursor = conn.cursor()
+
             consulta = "SELECT * FROM avaliacoes WHERE DATE(DATA_HORA) = %s"
             cursor.execute(consulta, (data_convertida,))
             resultados = cursor.fetchall()
@@ -262,20 +319,38 @@ def construir_pagina_pesquisa(frame):
             resultado_pesquisa.delete("0.0", "end")
 
             if resultados:
-                for linha in resultados:
-                    texto = f"""ID: {linha[0]}
-                        Data/Hora: {linha[1]}
-                        Vegetariano - Ótimo: {linha[2]}, Bom: {linha[3]}, Ruim: {linha[4]}
-                        Carne Branca - Ótimo: {linha[5]}, Bom: {linha[6]}, Ruim: {linha[7]}
-                        Carne Vermelha - Ótimo: {linha[8]}, Bom: {linha[9]}, Ruim: {linha[10]}
-                        Total de votos: {linha[11]}
+                # Inicializa totais locais
+                veg_otimo = veg_bom = veg_ruim = 0
+                carne_branca_otimo = carne_branca_bom = carne_branca_ruim = 0
+                carne_vermelha_otimo = carne_vermelha_bom = carne_vermelha_ruim = 0
+                total = 0
 
-                        -------------------------
-                        """
-                    resultado_pesquisa.insert("end", texto)
+                for linha in resultados:
+                    veg_otimo += linha[2]
+                    veg_bom += linha[3]
+                    veg_ruim += linha[4]
+                    carne_branca_otimo += linha[5]
+                    carne_branca_bom += linha[6]
+                    carne_branca_ruim += linha[7]
+                    carne_vermelha_otimo += linha[8]
+                    carne_vermelha_bom += linha[9]
+                    carne_vermelha_ruim += linha[10]
+                    total += linha[11]
+
+                # Se quiser mostrar os totais finais:
+                totais = f"""===== TOTAIS DO DIA =====
+Vegetariano - Ótimo: {veg_otimo}, Bom: {veg_bom}, Ruim: {veg_ruim}
+Carne Branca - Ótimo: {carne_branca_otimo}, Bom: {carne_branca_bom}, Ruim: {carne_branca_ruim}
+Carne Vermelha - Ótimo: {carne_vermelha_otimo}, Bom: {carne_vermelha_bom}, Ruim: {carne_vermelha_ruim}
+Total Geral de votos: {total}
+======================
+
+                            """
+                resultado_pesquisa.insert("end", totais)
+
             else:
                 resultado_pesquisa.insert("end", "Nenhum resultado encontrado.")
-            
+
             cursor.close()
             conn.close()
 
@@ -284,6 +359,7 @@ def construir_pagina_pesquisa(frame):
             resultado_pesquisa.insert("end", "Data inválida. Use o formato DD-MM-AAAA.")
         except Exception as e:
             resultado_pesquisa.insert("end", f"Erro ao buscar dados: {e}")
+
 
 # === Função para trocar entre páginas ===
 def mostrar_pagina(nome):
