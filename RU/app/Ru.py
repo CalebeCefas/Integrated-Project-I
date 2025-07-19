@@ -4,6 +4,12 @@ import mysql.connector  # Acesso ao banco de dados MySQL
 import customtkinter as ctk  # Biblioteca de interface gráfica personalizada baseada em Tkinter
 import threading  # Para rodar leitura da serial em segundo plano
 from datetime import datetime  # Para manipular datas e horários
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+from datetime import datetime, timedelta
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from collections import defaultdict
+import tkinter as tk
 
 # === Função para conectar ao banco de dados MySQL ===
 def conectar_banco():
@@ -44,6 +50,7 @@ tema.set("Dark")
 
 # Botões do menu de navegação
 ctk.CTkButton(sidebar, text="Votação", command=lambda: mostrar_pagina("Votação")).pack(pady=10, fill="x", padx=10)
+ctk.CTkButton(sidebar, text="Gráficos", command=lambda: mostrar_pagina("Gráficos")).pack(pady=10, fill="x", padx=10)
 ctk.CTkButton(sidebar, text="Pesquisa", command=lambda: mostrar_pagina("Pesquisa")).pack(pady=10, fill="x", padx=10)
 
 # Dicionário para armazenar páginas carregadas
@@ -286,6 +293,110 @@ def construir_pagina_votacao(frame):
         except Exception as e:
             print("Erro ao salvar no banco:", e)
 
+def construir_graficos_sete_dias(frame_alvo):
+    try:
+        conn = conectar_banco()  # Abre conexão com o banco MySQL
+        cursor = conn.cursor()   # Cria cursor para executar comandos SQL
+
+        hoje = datetime.now().date()  # Data atual (só a parte da data, sem hora)
+        sete_dias_atras = hoje - timedelta(days=6)  # Data de 6 dias atrás, para pegar 7 dias no total (hoje + 6 atrás)
+
+        # Query SQL que soma votos ótimos, bons e ruins de cada tipo de carne por dia
+        query = """
+            SELECT 
+                DATE(DATA_HORA),
+                SUM(CVM_OTIMO), SUM(CVM_BOM), SUM(CVM_RUIM),
+                SUM(CB_OTIMO), SUM(CB_BOM), SUM(CB_RUIM),
+                SUM(VG_OTIMO), SUM(VG_BOM), SUM(VG_RUIM)
+            FROM avaliacoes
+            WHERE DATE(DATA_HORA) BETWEEN %s AND %s
+            GROUP BY DATE(DATA_HORA)
+            ORDER BY DATE(DATA_HORA)
+        """
+        cursor.execute(query, (sete_dias_atras, hoje))  # Executa a query passando o intervalo de datas
+        resultados = cursor.fetchall()  # Pega todos os resultados retornados
+        conn.close()  # Fecha a conexão com o banco
+
+        # Organiza os dados numa estrutura de dicionários para facilitar acesso depois
+        dados_por_dia = {
+            r[0]: {  # Data (DATE(DATA_HORA))
+                'CVM': {'otimo': r[1], 'bom': r[2], 'ruim': r[3]},  # Carne Vermelha votos
+                'CB': {'otimo': r[4], 'bom': r[5], 'ruim': r[6]},   # Carne Branca votos
+                'VG': {'otimo': r[7], 'bom': r[8], 'ruim': r[9]}    # Vegetariano votos
+            } for r in resultados
+        }
+
+        # Lista de datas dos últimos 7 dias (de 6 dias atrás até hoje)
+        datas = [sete_dias_atras + timedelta(days=i) for i in range(7)]
+
+        # Função auxiliar para extrair a lista de votos para um tipo (CVM, CB, VG) e nível (otimo, bom, ruim)
+        def extrair(tipo, nivel):
+            # Para cada data, tenta pegar o valor, se não achar retorna 0
+            return [dados_por_dia.get(data, {}).get(tipo, {}).get(nivel, 0) for data in datas]
+
+        # Mapas para legenda e títulos
+        tipos = {'CVM': 'Carne Vermelha', 'CB': 'Carne Branca', 'VG': 'Vegetariano'}
+        niveis = {
+            'otimo': ('Ótimo', 'green'),
+            'bom': ('Bom', 'orange'),
+            'ruim': ('Ruim', 'red')
+        }
+
+        # Limpa todos os widgets que já estavam no frame_alvo, para desenhar os gráficos do zero
+        for widget in frame_alvo.winfo_children():
+            widget.destroy()
+
+        # Cria um Canvas dentro do frame_alvo (canvas é o widget que permite rolar conteúdo)
+        canvas = tk.Canvas(frame_alvo)
+        # Cria uma Scrollbar vertical ligada ao canvas
+        scrollbar = tk.Scrollbar(frame_alvo, orient="vertical", command=canvas.yview)
+        # Cria um frame interno, que ficará dentro do canvas, onde os gráficos serão realmente colocados
+        frame_interno = tk.Frame(canvas)
+
+        # Sempre que o frame_interno muda de tamanho, atualiza a região rolável do canvas para cobrir tudo
+        frame_interno.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+
+        # Cria uma "janela" dentro do canvas onde o frame_interno será exibido, ancorado no canto superior esquerdo (nw)
+        canvas.create_window((0, 0), window=frame_interno, anchor="nw")
+        # Configura o canvas para usar o scrollbar para controle vertical da rolagem
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Empacota o canvas para ocupar o lado esquerdo, preenchendo e expandindo para todo o frame_alvo
+        canvas.pack(side="left", fill="both", expand=True)
+        # Empacota a scrollbar no lado direito, preenchendo verticalmente
+        scrollbar.pack(side="right", fill="y")
+
+        # Loop para criar os três gráficos (ótimo, bom, ruim)
+        for nivel, (titulo_nivel, cor) in niveis.items():
+            # Cria figura e eixo com matplotlib, tamanho 12x7 polegadas
+            fig, ax = plt.subplots(figsize=(12, 7))
+            # Para cada tipo de carne, desenha uma linha no gráfico
+            for tipo, nome_legenda in tipos.items():
+                ax.plot(
+                    datas,           # eixo X: datas
+                    extrair(tipo, nivel),  # eixo Y: votos para tipo e nível
+                    label=nome_legenda      # legenda da linha
+                )
+
+            ax.set_title(f"Votos '{titulo_nivel}' - Últimos 7 Dias")  # Título do gráfico
+            ax.set_xlabel("Data")         # Rótulo eixo X
+            ax.set_ylabel("Quantidade de Votos")  # Rótulo eixo Y
+            ax.legend()                   # Exibe legenda
+            ax.grid(True)                 # Exibe grade
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%d/%m'))  # Formata as datas no eixo X
+
+            # Cria widget do matplotlib dentro do frame_interno do Tkinter
+            canvas_fig = FigureCanvasTkAgg(fig, master=frame_interno)
+            canvas_fig.draw()             # Desenha o gráfico
+            # Empacota o gráfico com padding vertical, para ficar espaçado
+            canvas_fig.get_tk_widget().pack(pady=10, fill="both", expand=True)
+
+    except Exception as e:
+        print(f"Erro ao construir gráficos: {e}")
+
 # === Página de Pesquisa de dados salvos ===
 def construir_pagina_pesquisa(frame):
     ctk.CTkLabel(frame, text="Pesquisa", font=("Arial", 18)).pack(pady=10)
@@ -308,7 +419,7 @@ def construir_pagina_pesquisa(frame):
 
     def pesquisar_data(data):
         try:
-            data_convertida = datetime.strptime(data, "%d-%m-%Y").date()  # Converte para datetime.date
+            data_convertida = datetime.strptime(data, "%d-%m-%Y").date()
             conn = conectar_banco()
             cursor = conn.cursor()
 
@@ -319,34 +430,48 @@ def construir_pagina_pesquisa(frame):
             resultado_pesquisa.delete("0.0", "end")
 
             if resultados:
-                # Inicializa totais locais
-                veg_otimo = veg_bom = veg_ruim = 0
-                carne_branca_otimo = carne_branca_bom = carne_branca_ruim = 0
-                carne_vermelha_otimo = carne_vermelha_bom = carne_vermelha_ruim = 0
-                total = 0
+                # Intervalos com tolerância
+                almoco_inicio = time(11, 10)
+                almoco_fim = time(13, 20)
+                janta_inicio = time(16, 10)
+                janta_fim = time(19, 20)
+
+                # Inicializa contadores
+                totais = {
+                    "almoço": {"veg": [0, 0, 0], "branca": [0, 0, 0], "vermelha": [0, 0, 0], "total": 0},
+                    "janta": {"veg": [0, 0, 0], "branca": [0, 0, 0], "vermelha": [0, 0, 0], "total": 0}
+                }
 
                 for linha in resultados:
-                    veg_otimo += linha[2]
-                    veg_bom += linha[3]
-                    veg_ruim += linha[4]
-                    carne_branca_otimo += linha[5]
-                    carne_branca_bom += linha[6]
-                    carne_branca_ruim += linha[7]
-                    carne_vermelha_otimo += linha[8]
-                    carne_vermelha_bom += linha[9]
-                    carne_vermelha_ruim += linha[10]
-                    total += linha[11]
+                    hora = linha[1].time()  # DATA_HORA é a coluna 1
+                    periodo = None
+                    if almoco_inicio <= hora <= almoco_fim:
+                        periodo = "almoço"
+                    elif janta_inicio <= hora <= janta_fim:
+                        periodo = "janta"
 
-                # Se quiser mostrar os totais finais:
-                totais = f"""===== TOTAIS DO DIA =====
-Vegetariano - Ótimo: {veg_otimo}, Bom: {veg_bom}, Ruim: {veg_ruim}
-Carne Branca - Ótimo: {carne_branca_otimo}, Bom: {carne_branca_bom}, Ruim: {carne_branca_ruim}
-Carne Vermelha - Ótimo: {carne_vermelha_otimo}, Bom: {carne_vermelha_bom}, Ruim: {carne_vermelha_ruim}
-Total Geral de votos: {total}
-======================
+                    if periodo:
+                        totais[periodo]["veg"][0] += linha[2]
+                        totais[periodo]["veg"][1] += linha[3]
+                        totais[periodo]["veg"][2] += linha[4]
+                        totais[periodo]["branca"][0] += linha[5]
+                        totais[periodo]["branca"][1] += linha[6]
+                        totais[periodo]["branca"][2] += linha[7]
+                        totais[periodo]["vermelha"][0] += linha[8]
+                        totais[periodo]["vermelha"][1] += linha[9]
+                        totais[periodo]["vermelha"][2] += linha[10]
+                        totais[periodo]["total"] += linha[11]
 
-                            """
-                resultado_pesquisa.insert("end", totais)
+                texto = ""
+                for periodo in ["almoço", "janta"]:
+                    texto += f"===== TOTAIS DO {periodo.upper()} =====\n"
+                    texto += f"Vegetariano - Ótimo: {totais[periodo]['veg'][0]}, Bom: {totais[periodo]['veg'][1]}, Ruim: {totais[periodo]['veg'][2]}\n"
+                    texto += f"Carne Branca - Ótimo: {totais[periodo]['branca'][0]}, Bom: {totais[periodo]['branca'][1]}, Ruim: {totais[periodo]['branca'][2]}\n"
+                    texto += f"Carne Vermelha - Ótimo: {totais[periodo]['vermelha'][0]}, Bom: {totais[periodo]['vermelha'][1]}, Ruim: {totais[periodo]['vermelha'][2]}\n"
+                    texto += f"Total Geral de votos: {totais[periodo]['total']}\n"
+                    texto += "======================\n\n"
+
+                resultado_pesquisa.insert("end", texto)
 
             else:
                 resultado_pesquisa.insert("end", "Nenhum resultado encontrado.")
@@ -373,6 +498,8 @@ def mostrar_pagina(nome):
 
         if nome == "Votação":
             construir_pagina_votacao(frame)
+        elif nome == "Gráficos":
+            construir_graficos_sete_dias(frame)
         elif nome == "Pesquisa":
             construir_pagina_pesquisa(frame)
     else:
