@@ -7,15 +7,17 @@ class Search(ctk.CTkFrame):
         super().__init__(master)
         self.db_manager = db_manager
         self.current_page = 0
-        self.items_per_page = 15 # Aumentado para mostrar mais resumos
+        self.items_per_page = 15
 
         ctk.CTkLabel(self, text="Resumo de Votos", font=("Arial", 18, "bold")).pack(pady=10)
 
         self.build_search_ui()
         self.load_data()
 
+        self.bind("<Configure>", self.on_resize)
+
     def build_search_ui(self):
-        # Frame para a barra de pesquisa
+        
         frame_pesquisa = ctk.CTkFrame(self, fg_color="transparent")
         frame_pesquisa.pack(pady=10, padx=20, fill="x")
 
@@ -28,14 +30,12 @@ class Search(ctk.CTkFrame):
         botao_limpar = ctk.CTkButton(frame_pesquisa, text="Limpar Filtro", command=self.limpar_pesquisa)
         botao_limpar.pack(side="left", padx=10)
 
-        # Frame para exibir os resultados
         self.resultado_frame = ctk.CTkFrame(self)
         self.resultado_frame.pack(pady=10, padx=20, fill="both", expand=True)
         
-        self.resultado_textbox = ctk.CTkTextbox(self.resultado_frame, height=300, width=600, font=("Courier New", 12))
+        self.resultado_textbox = ctk.CTkTextbox(self.resultado_frame, height=300, width=600)
         self.resultado_textbox.pack(pady=(0,10), fill="both", expand=True)
 
-        # Frame para os botões de paginação
         pagination_frame = ctk.CTkFrame(self, fg_color="transparent")
         pagination_frame.pack(pady=10, padx=20, fill="x", side="bottom")
 
@@ -48,6 +48,14 @@ class Search(ctk.CTkFrame):
         self.next_button = ctk.CTkButton(pagination_frame, text="Próximo", command=self.next_page)
         self.next_button.pack(side="left")
 
+    # ---- FUNÇÃO PARA RESPONSIVIDADE ----
+    def on_resize(self, event):
+        # O divisor (ex: 60) é um "fator de escala". Você pode ajustá-lo.
+        # Um número menor resulta em uma fonte maior.
+        # max(10, ...) garante que a fonte nunca fique menor que 10.
+        new_font_size = max(12, int(event.width / 50))
+        self.resultado_textbox.configure(font=("Courier New", new_font_size))
+
     def load_data(self, data_filtro=None):
         if not self.db_manager or not self.db_manager.connection:
             self.resultado_textbox.delete("1.0", "end")
@@ -57,7 +65,6 @@ class Search(ctk.CTkFrame):
         try:
             cursor = self.db_manager.connection.cursor()
             
-            # Query para agrupar e contar os votos
             query = """
                 SELECT 
                     r.data AS dia,
@@ -72,11 +79,12 @@ class Search(ctk.CTkFrame):
                     registro AS r
                 JOIN 
                     pratos AS p ON r.ID_PRATO = p.ID
+                WHERE r.data IS NOT NULL
             """
             params = []
             
             if data_filtro:
-                query += " WHERE r.data = %s"
+                query += " AND r.data = %s"
                 params.append(data_filtro)
 
             query += """
@@ -95,15 +103,12 @@ class Search(ctk.CTkFrame):
                 self.resultado_textbox.insert("end", "Nenhum resultado encontrado para o filtro aplicado.")
                 self.next_button.configure(state="disabled")
             else:
-                # Cabeçalho da tabela
                 header = f"{'Data':<12}{'Período':<10}{'Prato':<15}{'Avaliação':<10}{'Votos'}\n"
                 header += "="*55 + "\n"
                 self.resultado_textbox.insert("end", header)
                 
-                # Mapa para nomes mais amigáveis
                 prato_map = {'CVM': 'C. Vermelha', 'CB': 'C. Branca', 'VG': 'Vegetariano'}
                 
-                # Exibição dos dados
                 for dia, periodo, prato, avaliacao, quantidade in resultados:
                     prato_formatado = prato_map.get(prato, prato)
                     linha = f"{str(dia):<12}{periodo:<10}{prato_formatado:<15}{avaliacao:<10}{quantidade}\n"
