@@ -1,98 +1,156 @@
 import customtkinter as ctk
-from datetime import datetime, time
-from core.db import DB
+from datetime import datetime
+from tkinter import messagebox
 
 class Search(ctk.CTkFrame):
     def __init__(self, master, db_manager=None, serial_reader=None):
         super().__init__(master)
         self.db_manager = db_manager
+        self.current_page = 0
+        self.items_per_page = 15 # Aumentado para mostrar mais resumos
 
-        ctk.CTkLabel(self, text="Pesquisa", font=("Arial", 18)).pack(pady=10)
+        ctk.CTkLabel(self, text="Resumo de Votos", font=("Arial", 18, "bold")).pack(pady=10)
 
-        # Cria a interface da pesquisa
         self.build_search_ui()
+        self.load_data()
 
     def build_search_ui(self):
-        ctk.CTkLabel(self, text="Pesquisa de Votos por Data", font=("Arial", 18, "bold")).pack(pady=10)
+        # Frame para a barra de pesquisa
+        frame_pesquisa = ctk.CTkFrame(self, fg_color="transparent")
+        frame_pesquisa.pack(pady=10, padx=20, fill="x")
 
-        frame_pesquisa = ctk.CTkFrame(self)
-        frame_pesquisa.pack(pady=10)
+        self.entrada_data = ctk.CTkEntry(frame_pesquisa, placeholder_text="Filtrar por data (DD-MM-AAAA)")
+        self.entrada_data.pack(side="left", padx=(0, 10), fill="x", expand=True)
 
-        self.entrada_data = ctk.CTkEntry(frame_pesquisa, placeholder_text="Data (DD-MM-AAAA)")
-        self.entrada_data.pack(side="left", padx=10)
-
-        botao_pesquisar = ctk.CTkButton(frame_pesquisa, text="Pesquisar", command=self.pesquisar_data)
+        botao_pesquisar = ctk.CTkButton(frame_pesquisa, text="Filtrar", command=self.pesquisar_data)
         botao_pesquisar.pack(side="left")
 
-        self.resultado_pesquisa = ctk.CTkTextbox(self, height=300, width=600)
-        self.resultado_pesquisa.pack(pady=10)
+        botao_limpar = ctk.CTkButton(frame_pesquisa, text="Limpar Filtro", command=self.limpar_pesquisa)
+        botao_limpar.pack(side="left", padx=10)
+
+        # Frame para exibir os resultados
+        self.resultado_frame = ctk.CTkFrame(self)
+        self.resultado_frame.pack(pady=10, padx=20, fill="both", expand=True)
+        
+        self.resultado_textbox = ctk.CTkTextbox(self.resultado_frame, height=300, width=600, font=("Courier New", 12))
+        self.resultado_textbox.pack(pady=(0,10), fill="both", expand=True)
+
+        # Frame para os botões de paginação
+        pagination_frame = ctk.CTkFrame(self, fg_color="transparent")
+        pagination_frame.pack(pady=10, padx=20, fill="x", side="bottom")
+
+        self.prev_button = ctk.CTkButton(pagination_frame, text="Anterior", command=self.prev_page)
+        self.prev_button.pack(side="left")
+        
+        self.page_label = ctk.CTkLabel(pagination_frame, text=f"Página {self.current_page + 1}")
+        self.page_label.pack(side="left", padx=20)
+
+        self.next_button = ctk.CTkButton(pagination_frame, text="Próximo", command=self.next_page)
+        self.next_button.pack(side="left")
+
+    def load_data(self, data_filtro=None):
+        if not self.db_manager or not self.db_manager.connection:
+            self.resultado_textbox.delete("1.0", "end")
+            self.resultado_textbox.insert("end", "Banco de dados não conectado.")
+            return
+
+        try:
+            cursor = self.db_manager.connection.cursor()
+            
+            # Query para agrupar e contar os votos
+            query = """
+                SELECT 
+                    r.data AS dia,
+                    CASE 
+                        WHEN r.hora BETWEEN '11:00:00' AND '13:30:00' THEN 'Almoço'
+                        ELSE 'Janta'
+                    END AS periodo,
+                    p.prato,
+                    p.avaliacao,
+                    COUNT(r.ID) AS quantidade
+                FROM 
+                    registro AS r
+                JOIN 
+                    pratos AS p ON r.ID_PRATO = p.ID
+            """
+            params = []
+            
+            if data_filtro:
+                query += " WHERE r.data = %s"
+                params.append(data_filtro)
+
+            query += """
+                GROUP BY dia, periodo, p.prato, p.avaliacao
+                ORDER BY dia DESC, periodo DESC, p.prato, p.avaliacao
+                LIMIT %s OFFSET %s
+            """
+            offset = self.current_page * self.items_per_page
+            params.extend([self.items_per_page, offset])
+            
+            cursor.execute(query, tuple(params))
+            resultados = cursor.fetchall()
+            
+            self.resultado_textbox.delete("1.0", "end")
+            if not resultados:
+                self.resultado_textbox.insert("end", "Nenhum resultado encontrado para o filtro aplicado.")
+                self.next_button.configure(state="disabled")
+            else:
+                # Cabeçalho da tabela
+                header = f"{'Data':<12}{'Período':<10}{'Prato':<15}{'Avaliação':<10}{'Votos'}\n"
+                header += "="*55 + "\n"
+                self.resultado_textbox.insert("end", header)
+                
+                # Mapa para nomes mais amigáveis
+                prato_map = {'CVM': 'C. Vermelha', 'CB': 'C. Branca', 'VG': 'Vegetariano'}
+                
+                # Exibição dos dados
+                for dia, periodo, prato, avaliacao, quantidade in resultados:
+                    prato_formatado = prato_map.get(prato, prato)
+                    linha = f"{str(dia):<12}{periodo:<10}{prato_formatado:<15}{avaliacao:<10}{quantidade}\n"
+                    self.resultado_textbox.insert("end", linha)
+                
+                self.next_button.configure(state="normal")
+
+            self.prev_button.configure(state="normal" if self.current_page > 0 else "disabled")
+            self.page_label.configure(text=f"Página {self.current_page + 1}")
+            
+            cursor.close()
+
+        except Exception as e:
+            messagebox.showerror("Erro de Banco de Dados", f"Erro ao buscar dados: {e}")
 
     def pesquisar_data(self):
-        data = self.entrada_data.get()
+        data_str = self.entrada_data.get()
+        if not data_str:
+            self.limpar_pesquisa()
+            return
+            
         try:
-            data_convertida = datetime.strptime(data, "%d-%m-%Y").date()
-
-            # Usa a conexão do db_manager, se disponível
-            if self.db_manager:
-                conn = self.db_manager.connection
-                cursor = conn.cursor()
-
-                consulta = "SELECT * FROM avaliacoes WHERE DATE(DATA_HORA) = %s"
-                cursor.execute(consulta, (data_convertida,))
-                resultados = cursor.fetchall()
-
-                self.resultado_pesquisa.delete("0.0", "end")
-
-                if resultados:
-                    almoco_inicio = time(11, 10)
-                    almoco_fim = time(13, 20)
-                    janta_inicio = time(16, 10)
-                    janta_fim = time(19, 20)
-
-                    totais = {
-                        "almoço": {"veg": [0, 0, 0], "branca": [0, 0, 0], "vermelha": [0, 0, 0], "total": 0},
-                        "janta": {"veg": [0, 0, 0], "branca": [0, 0, 0], "vermelha": [0, 0, 0], "total": 0}
-                    }
-
-                    for linha in resultados:
-                        hora = linha[1].time()  # DATA_HORA é a coluna 1
-                        periodo = None
-                        if almoco_inicio <= hora <= almoco_fim:
-                            periodo = "almoço"
-                        elif janta_inicio <= hora <= janta_fim:
-                            periodo = "janta"
-
-                        if periodo:
-                            totais[periodo]["veg"][0] += linha[2]
-                            totais[periodo]["veg"][1] += linha[3]
-                            totais[periodo]["veg"][2] += linha[4]
-                            totais[periodo]["branca"][0] += linha[5]
-                            totais[periodo]["branca"][1] += linha[6]
-                            totais[periodo]["branca"][2] += linha[7]
-                            totais[periodo]["vermelha"][0] += linha[8]
-                            totais[periodo]["vermelha"][1] += linha[9]
-                            totais[periodo]["vermelha"][2] += linha[10]
-                            totais[periodo]["total"] += linha[11]
-
-                    texto = ""
-                    for periodo in ["almoço", "janta"]:
-                        texto += f"===== TOTAIS DO {periodo.upper()} =====\n"
-                        texto += f"Vegetariano - Ótimo: {totais[periodo]['veg'][0]}, Bom: {totais[periodo]['veg'][1]}, Ruim: {totais[periodo]['veg'][2]}\n"
-                        texto += f"Carne Branca - Ótimo: {totais[periodo]['branca'][0]}, Bom: {totais[periodo]['branca'][1]}, Ruim: {totais[periodo]['branca'][2]}\n"
-                        texto += f"Carne Vermelha - Ótimo: {totais[periodo]['vermelha'][0]}, Bom: {totais[periodo]['vermelha'][1]}, Ruim: {totais[periodo]['vermelha'][2]}\n"
-                        texto += f"Total Geral de votos: {totais[periodo]['total']}\n"
-                        texto += "======================\n\n"
-
-                    self.resultado_pesquisa.insert("end", texto)
-                else:
-                    self.resultado_pesquisa.insert("end", "Nenhum resultado encontrado.")
-
-                cursor.close()
-            else:
-                self.resultado_pesquisa.insert("end", "Banco de dados não conectado.")
-
+            data_convertida = datetime.strptime(data_str, "%d-%m-%Y").date()
+            self.current_page = 0
+            self.load_data(data_filtro=data_convertida)
         except ValueError:
-            self.resultado_pesquisa.delete("0.0", "end")
-            self.resultado_pesquisa.insert("end", "Data inválida. Use o formato DD-MM-AAAA.")
-        except Exception as e:
-            self.resultado_pesquisa.insert("end", f"Erro ao buscar dados: {e}")
+            messagebox.showerror("Formato Inválido", "Data inválida. Use o formato DD-MM-AAAA.")
+
+    def limpar_pesquisa(self):
+        self.entrada_data.delete(0, 'end')
+        self.current_page = 0
+        self.load_data()
+
+    def next_page(self):
+        self.current_page += 1
+        self.load_data(data_filtro=self._get_filtro_data())
+
+    def prev_page(self):
+        if self.current_page > 0:
+            self.current_page -= 1
+            self.load_data(data_filtro=self._get_filtro_data())
+            
+    def _get_filtro_data(self):
+        data_str = self.entrada_data.get()
+        if not data_str:
+            return None
+        try:
+            return datetime.strptime(data_str, "%d-%m-%Y").date()
+        except ValueError:
+            return None
