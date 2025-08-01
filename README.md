@@ -12,13 +12,13 @@ O projeto visa consertar e aprimorar o sistema de avaliação de refeições do 
 
 ## 👥 Equipe
 
-| Nome | Matrícula |
-|------|-----------|
-| Leticia Almeida Lima | 565799 |
-| Antônia Franciane Ferreira Ximenes | 568331 |
-| Gabriel Silva Nascimento | 571484 |
-| Calebe Cefas da Silva Sousa | 567735 |
-| Antônio Ruan Henrique Gomes | 568352 |
+| Nome |
+|------|
+| Leticia Almeida Lima |
+| Antônia Franciane Ferreira Ximenes |
+| Gabriel Silva Nascimento |
+| Calebe Cefas da Silva Sousa |
+| Antônio Ruan Henrique Gomes |
 
 ---
 
