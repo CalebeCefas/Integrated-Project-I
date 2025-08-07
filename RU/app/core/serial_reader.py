@@ -13,20 +13,20 @@ class SerialReader:
             self.serial_connection = serial.Serial(port=self.port, baudrate=self.baudrate, timeout=self.timeout)
 
             if self.serial_connection.is_open:
-                print(f"Conexão bem-sucedida à porta serial: {self.port}")
+                #print(f"Conexão bem-sucedida à porta serial: {self.port}")
                 return self
             else:
-                print(f"Erro: Porta {self.port} não pôde ser aberta.")
+                #print(f"Erro: Porta {self.port} não pôde ser aberta.")
                 self.serial_connection = None
                 return None
                 
         except serial.SerialException as e:
-            print(f"Erro ao conectar à porta serial {self.port}: {e}")
+            #print(f"Erro ao conectar à porta serial {self.port}: {e}")
             self.serial_connection = None
             return None
         
         except Exception as e:
-            print(f"Um erro inesperado ocorreu ao conectar: {e}")
+            #print(f"Um erro inesperado ocorreu ao conectar: {e}")
             self.serial_connection = None
             return None
 
@@ -35,7 +35,7 @@ class SerialReader:
         try:
             if self.serial_connection and self.serial_connection.is_open:
                 self.serial_connection.close()
-                print(f"Conexão com a porta {self.port} fechada.")
+                #print(f"Conexão com a porta {self.port} fechada.")
             elif self.serial_connection is None:
                 print(f"Nenhuma conexão ativa para a porta {self.port} para fechar.")
             else:

@@ -12,14 +12,15 @@ class App():
     def __init__(self):
         self.root=ctk.CTk()
         self.root.title("Avaliação da qualidade dos alimentos do RU - UFC")
-        self.root.geometry("800x600")
-        
+        self.root.geometry("1000x800")
+        self.root.resizable(False,False)
+
         # --------  CONFIG DB  --------
         self.db_config = {
             'host': 'localhost',
             'user': 'root',
-            'password': 'root123',
-            'database': 'RU'
+            'password': 'root',
+            'database': 'ru'
             }
         self.db_manager = None
 
@@ -57,7 +58,7 @@ class App():
         Sidebar(self.root, self.quitting, self.change_page)
         self.Wellcome()
 
-        # self.root.protocol("WM_DELETE_WINDOW", self.quitting)
+        self.root.protocol("WM_DELETE_WINDOW", self.quitting)
         self.root.mainloop()
 
     # Método para mudar de página
@@ -70,11 +71,10 @@ class App():
     # Método para fechar a aplicação
     def quitting(self):
         if messagebox.askokcancel("Sair", "Deseja realmente sair?"):
+            # Garante que os recursos são liberados antes de fechar a jane
             if self.db_manager:
                 self.db_manager.__exit__(None, None, None)
             if self.serial_reader:
-                if isinstance(self.current_page, Votting):
-                     self.current_page.serial_thread_running = False
                 self.serial_reader.__exit__(None, None, None)
 
             self.root.destroy()

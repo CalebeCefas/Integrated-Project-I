@@ -33,7 +33,7 @@ class Graph(ctk.CTkFrame):
         para o formato necessário para os gráficos.
         """
         if not self.db_manager or not self.db_manager.connection:
-            print("Gráficos: Banco de dados não conectado.")
+            #print("Gráficos: Banco de dados não conectado.")
             return {}, []
 
         dados_por_dia = {}
@@ -77,7 +77,7 @@ class Graph(ctk.CTkFrame):
             return dados_por_dia, datas_eixo_x
             
         except Exception as e:
-            print(f"Erro ao buscar dados para os gráficos: {e}")
+            #print(f"Erro ao buscar dados para os gráficos: {e}")
             return {}, []
 
     def construir_graficos(self):

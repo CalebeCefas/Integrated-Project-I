@@ -7,7 +7,8 @@ class Search(ctk.CTkFrame):
         super().__init__(master)
         self.db_manager = db_manager
         self.current_page = 0
-        self.items_per_page = 15
+        self.items_per_page = 30
+        self.total_records = 0
 
         ctk.CTkLabel(self, text="Resumo de Votos", font=("Arial", 18, "bold")).pack(pady=10)
 
@@ -17,12 +18,13 @@ class Search(ctk.CTkFrame):
         self.bind("<Configure>", self.on_resize)
 
     def build_search_ui(self):
-        
         frame_pesquisa = ctk.CTkFrame(self, fg_color="transparent")
         frame_pesquisa.pack(pady=10, padx=20, fill="x")
 
-        self.entrada_data = ctk.CTkEntry(frame_pesquisa, placeholder_text="Filtrar por data (DD-MM-AAAA)")
+        self.entrada_data = ctk.CTkEntry(frame_pesquisa, placeholder_text="Filtrar por data (DD/MM/AAAA)")
         self.entrada_data.pack(side="left", padx=(0, 10), fill="x", expand=True)
+
+        self.entrada_data.bind("<Return>", self.pesquisar_data)
 
         botao_pesquisar = ctk.CTkButton(frame_pesquisa, text="Filtrar", command=self.pesquisar_data)
         botao_pesquisar.pack(side="left")
@@ -47,12 +49,8 @@ class Search(ctk.CTkFrame):
 
         self.next_button = ctk.CTkButton(pagination_frame, text="Próximo", command=self.next_page)
         self.next_button.pack(side="left")
-
-    # ---- FUNÇÃO PARA RESPONSIVIDADE ----
+    
     def on_resize(self, event):
-        # O divisor (ex: 60) é um "fator de escala". Você pode ajustá-lo.
-        # Um número menor resulta em uma fonte maior.
-        # max(10, ...) garante que a fonte nunca fique menor que 10.
         new_font_size = max(12, int(event.width / 50))
         self.resultado_textbox.configure(font=("Courier New", new_font_size))
 
@@ -61,11 +59,31 @@ class Search(ctk.CTkFrame):
             self.resultado_textbox.delete("1.0", "end")
             self.resultado_textbox.insert("end", "Banco de dados não conectado.")
             return
-
+            
         try:
             cursor = self.db_manager.connection.cursor()
             
-            query = """
+            # Consulta para a contagem total de registros com o filtro
+            count_query = """
+                SELECT COUNT(*) FROM (
+                    SELECT 1 FROM registro AS r
+                    JOIN pratos AS p ON r.ID_PRATO = p.ID
+                    WHERE r.data IS NOT NULL
+            """
+            
+            params = []
+            if data_filtro:
+                count_query += " AND r.data = %s"
+                params.append(data_filtro)
+                
+            count_query += " GROUP BY r.data, CASE WHEN r.hora BETWEEN '11:00:00' AND '13:30:00' THEN 'Almoço' ELSE 'Janta' END, p.prato, p.avaliacao) AS subquery"
+            
+            cursor.execute(count_query, tuple(params))
+            total_records = cursor.fetchone()[0]
+            self.total_records = total_records
+
+            # Consulta para buscar os dados da página atual
+            data_query = """
                 SELECT 
                     r.data AS dia,
                     CASE 
@@ -81,27 +99,26 @@ class Search(ctk.CTkFrame):
                     pratos AS p ON r.ID_PRATO = p.ID
                 WHERE r.data IS NOT NULL
             """
-            params = []
             
+            params_data = []
             if data_filtro:
-                query += " AND r.data = %s"
-                params.append(data_filtro)
+                data_query += " AND r.data = %s"
+                params_data.append(data_filtro)
 
-            query += """
+            data_query += """
                 GROUP BY dia, periodo, p.prato, p.avaliacao
                 ORDER BY dia DESC, periodo DESC, p.prato, p.avaliacao
                 LIMIT %s OFFSET %s
             """
             offset = self.current_page * self.items_per_page
-            params.extend([self.items_per_page, offset])
+            params_data.extend([self.items_per_page, offset])
             
-            cursor.execute(query, tuple(params))
+            cursor.execute(data_query, tuple(params_data))
             resultados = cursor.fetchall()
             
             self.resultado_textbox.delete("1.0", "end")
             if not resultados:
                 self.resultado_textbox.insert("end", "Nenhum resultado encontrado para o filtro aplicado.")
-                self.next_button.configure(state="disabled")
             else:
                 header = f"{'Data':<12}{'Período':<10}{'Prato':<15}{'Avaliação':<10}{'Votos'}\n"
                 header += "="*55 + "\n"
@@ -113,29 +130,31 @@ class Search(ctk.CTkFrame):
                     prato_formatado = prato_map.get(prato, prato)
                     linha = f"{str(dia):<12}{periodo:<10}{prato_formatado:<15}{avaliacao:<10}{quantidade}\n"
                     self.resultado_textbox.insert("end", linha)
-                
-                self.next_button.configure(state="normal")
 
-            self.prev_button.configure(state="normal" if self.current_page > 0 else "disabled")
-            self.page_label.configure(text=f"Página {self.current_page + 1}")
+            self._update_pagination_buttons()
             
             cursor.close()
 
         except Exception as e:
             messagebox.showerror("Erro de Banco de Dados", f"Erro ao buscar dados: {e}")
 
-    def pesquisar_data(self):
+    def _update_pagination_buttons(self):
+        self.next_button.configure(state="normal" if (self.current_page + 1) * self.items_per_page < self.total_records else "disabled")
+        self.prev_button.configure(state="normal" if self.current_page > 0 else "disabled")
+        self.page_label.configure(text=f"Página {self.current_page + 1}")
+
+    def pesquisar_data(self, event=None):
         data_str = self.entrada_data.get()
         if not data_str:
             self.limpar_pesquisa()
             return
             
         try:
-            data_convertida = datetime.strptime(data_str, "%d-%m-%Y").date()
+            data_convertida = datetime.strptime(data_str, "%d/%m/%Y").date()
             self.current_page = 0
             self.load_data(data_filtro=data_convertida)
         except ValueError:
-            messagebox.showerror("Formato Inválido", "Data inválida. Use o formato DD-MM-AAAA.")
+            messagebox.showerror("Formato Inválido", "Data inválida. Use o formato DD/MM/AAAA.")
 
     def limpar_pesquisa(self):
         self.entrada_data.delete(0, 'end')
@@ -156,6 +175,6 @@ class Search(ctk.CTkFrame):
         if not data_str:
             return None
         try:
-            return datetime.strptime(data_str, "%d-%m-%Y").date()
+            return datetime.strptime(data_str, "%d/%m/%Y").date()
         except ValueError:
             return None

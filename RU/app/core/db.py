@@ -17,10 +17,10 @@ class DB:
                 password=self.password,
                 database=self.database
             )
-            print("Conexão bem-sucedida ao banco de dados.")
+            #print("Conexão bem-sucedida ao banco de dados.")
             return self
         except mysql.connector.Error as err:
-            print(f"Erro ao conectar ao banco de dados: {err}")
+            #print(f"Erro ao conectar ao banco de dados: {err}")
             self.connection = None
             raise
 
@@ -28,14 +28,14 @@ class DB:
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.connection and self.connection.is_connected():
             self.connection.close()
-            print("Conexão com o banco de dados fechada.")
+            #print("Conexão com o banco de dados fechada.")
         elif self.connection is None:
             print("Nenhuma conexão foi estabelecida.")
         
     # Metodo para inserir/atualizar/deletar dados no banco de dados
     def execute_query(self,query, data=None):
         if not self.connection or not self.connection.is_connected():
-            print("Nenhuma conexão ativa. Conecte-se antes de executar as queries.")
+            #print("Nenhuma conexão ativa. Conecte-se antes de executar as queries.")
             return False
         
         cursor = self.connection.cursor()
@@ -45,10 +45,10 @@ class DB:
             else:
                 cursor.execute(query)
             self.connection.commit()
-            print("Comando executado e confirmado com sucesso.")
+            #print("Comando executado e confirmado com sucesso.")
             return True
         except mysql.connector.Error as err:
-            print(f"Erro ao executar o comando: {err}")
+            #print(f"Erro ao executar o comando: {err}")
             self.connection.rollback()
             return False
         finally:
@@ -57,7 +57,7 @@ class DB:
     # Metodo para consultar dados no banco de dados
     def fetch_data(self, query, data=None):
         if not self.connection or not self.connection.is_connected():
-            print("Nenhuma conexão ativa. Conecte-se antes de buscar os dados.")
+            #print("Nenhuma conexão ativa. Conecte-se antes de buscar os dados.")
             return None
         
         cursor = self.connection.cursor()
@@ -69,7 +69,7 @@ class DB:
             results = cursor.fetchall() 
             return results   
         except mysql.connector.Error as err:
-            print(f"Erro ao buscar a consulta: {err}")
+            #print(f"Erro ao buscar a consulta: {err}")
             return None
         finally:
             cursor.close()
