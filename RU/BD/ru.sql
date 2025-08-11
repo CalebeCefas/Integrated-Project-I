@@ -23,8 +23,8 @@ INSERT INTO ru.pratos (`prato`, `avaliacao`) VALUES
 
 CREATE TABLE IF NOT EXISTS registro (
     ID INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
-    data DATE NOT NULL DEFAULT CURRENT_DATE,
-    hora TIME NOT NULL DEFAULT CURRENT_TIME,
+    data DATE NOT NULL,
+    hora TIME NOT NULL,
     ID_PRATO INT(11) UNSIGNED NOT NULL,
     PRIMARY KEY (ID),
     INDEX (data),
@@ -39,7 +39,7 @@ CREATE OR REPLACE VIEW ru.vw_resumo_diario AS
 SELECT 
     r.data AS dia,
     CASE 
-        WHEN r.hora BETWEEN '11:00:00' AND '13:30:00' THEN 'Almoço'
+        WHEN r.hora BETWEEN '11:00:00' AND '14:00:00' THEN 'Almoço'
         ELSE 'Janta'
     END AS periodo,
     
@@ -54,4 +54,3 @@ JOIN
     ru.pratos AS pa ON r.ID_PRATO = pa.ID
 GROUP BY 
     dia, periodo;
-
